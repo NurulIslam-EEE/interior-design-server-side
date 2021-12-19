@@ -18,6 +18,7 @@ async function run() {
         const database = client.db('interior_design');
         const usersCollection = database.collection('users');
         const servicesCollection = database.collection('services');
+        const ordersCollection = database.collection('services');
         // add user
         app.post('/users', async (req, res) => {
             const user = req.body;
@@ -38,8 +39,55 @@ async function run() {
             const cursor = servicesCollection.find({});
             const services = await cursor.toArray();
             res.json(services);
+        })
+
+        app.post('/order', async (req, res) => {
+            const appointment = req.body;
+            const result = await ordersCollection.insertOne(appointment); res.json(result)
         });
+
+        app.put('/order/:id', async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updateDoc = { $set: { payment: payment } };
+            const result = await ordersCollection.updateOne(filter, updateDoc); res.json(result);
+        });
+
+
+        app.get('/users/:email', async (req, res) => {
+            const email = req.params.email;
+            const query = { email: email };
+            const user = await usersCollection.findOne(query);
+            let isAdmin = false;
+            if (user?.role === 'admin') {
+                isAdmin = true;
+            }
+            res.json({ admin: isAdmin });
+        })
+
+        app.put('/users', async (req, res) => {
+            const user = req.body;
+            const filter = { email: user.email };
+            const options = { upsert: true };
+            const updateDoc = { $set: user };
+            const result = await usersCollection.updateOne(filter, updateDoc, options);
+            res.json(result);
+        });
+
+        app.post('/create-payment-intent', async (req, res) => {
+            const paymentInfo = req.body;
+            const amount = paymentInfo.price * 100;
+            const paymentIntent = await stripe.paymentIntents.create({
+                currency: 'usd',
+                amount: amount,
+                payment_method_types: ['card']
+            });
+            res.json({ clientSecret: paymentIntent.client_secret })
+        })
     }
+
+
     finally {
         // await client.close();
     }
